@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ODS — Brief pour offres de services</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Sora:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css?v=sat-fields">
+</head>
+<body>
+  <div class="page-shell">
+    <div class="page-scroll" id="page-scroll">
+      <header class="masthead">
+        <p class="brand">ODS</p>
+        <div>
+          <h1>Brief pour générer une offre de service</h1>
+          <p class="lede">Questionnaire, grille 2026 et inclusions ODS — un document prêt pour l’IA.</p>
+        </div>
+      </header>
+
+      <main class="atelier">
+    <div class="tablist" role="tablist" aria-label="Formats d’offre">
+      <button
+        type="button"
+        class="tab"
+        role="tab"
+        id="tab-offre"
+        aria-controls="panel-offre"
+        aria-selected="true"
+        tabindex="0"
+      >
+        Offre de service
+      </button>
+      <button
+        type="button"
+        class="tab"
+        role="tab"
+        id="tab-resume"
+        aria-controls="panel-resume"
+        aria-selected="false"
+        tabindex="-1"
+      >
+        ODS résumé 3 options
+      </button>
+      <button
+        type="button"
+        class="tab"
+        role="tab"
+        id="tab-bot"
+        aria-controls="panel-bot"
+        aria-selected="false"
+        tabindex="-1"
+      >
+        Offre BOT
+      </button>
+    </div>
+
+    <section
+      class="panel"
+      role="tabpanel"
+      id="panel-offre"
+      aria-labelledby="tab-offre"
+    >
+      <nav class="studio-nav" aria-label="Sections de l’offre">
+        <a href="#block-questions">
+          <span>01</span>
+          Prise de besoin
+          <small id="nav-q">36 questions</small>
+        </a>
+        <a href="#block-prix">
+          <span>02</span>
+          Grille de prix
+          <small id="nav-p">19 catégories</small>
+        </a>
+        <a href="#block-inclusions">
+          <span>03</span>
+          Inclus / Exclus
+          <small id="nav-i">Inclusions ODS</small>
+        </a>
+      </nav>
+
+      <form id="offre-form" class="atelier-form">
+        <section class="block" id="block-questions">
+          <header class="block-head">
+            <p class="block-index">01</p>
+            <div>
+              <h2>Prise de besoin</h2>
+              <p>Questionnaire ODSquisse. Laissez vide ce qui n’est pas encore connu.</p>
+            </div>
+          </header>
+          <div id="questions-root"></div>
+        </section>
+
+        <section class="block" id="block-prix">
+          <header class="block-head">
+            <p class="block-index">02</p>
+            <div>
+              <h2>Grille de prix</h2>
+              <p>Catégories de la grille 2026. Ajoutez les items via la liste, puis ajustez la quantité.</p>
+            </div>
+          </header>
+          <div id="pricing-root"></div>
+          <div class="totals" id="pricing-totals"></div>
+        </section>
+
+        <section class="block" id="block-inclusions">
+          <header class="block-head">
+            <p class="block-index">03</p>
+            <div>
+              <h2>Inclusions et exclusions</h2>
+              <p>Grille de l’ODS de base. Basculez chaque élément.</p>
+            </div>
+          </header>
+          <div id="inclusions-root"></div>
+        </section>
+
+        <div class="ready-bar">
+          <p>Le brief reprend les réponses, la grille et les inclusions pour dépôt à l’IA.</p>
+          <div class="ready-actions">
+            <button type="button" class="ready-btn" id="ready-btn">Terminé</button>
+            <button type="button" class="ready-btn" id="to-options-btn">Vers les 3 options</button>
+          </div>
+        </div>
+      </form>
+    </section>
+
+    <section
+      class="panel"
+      role="tabpanel"
+      id="panel-resume"
+      aria-labelledby="tab-resume"
+      hidden
+    >
+      <div id="resume-locked" class="resume-locked" hidden>
+        <h2>Résumé 3 options</h2>
+        <p>Complétez d’abord la prise de besoin (entreprise, contact et rôle) pour construire les trois options.</p>
+        <button type="button" class="ready-btn" id="resume-back-btn">Retour à l’offre de service</button>
+      </div>
+
+      <div id="resume-content" class="resume-content" hidden>
+        <header class="block-head">
+          <p class="block-index">01</p>
+          <div>
+            <h2>One-pager — 3 options</h2>
+            <p>L’option 1 reprend la mensualité du premier onglet. Les options 2 et 3 s’enrichissent de bundles.</p>
+          </div>
+        </header>
+
+        <div class="resume-client" id="resume-client"></div>
+        <div class="options-grid" id="options-root"></div>
+
+        <div class="ready-bar">
+          <p>Génère un prompt one-pager pour l’IA à partir des trois options.</p>
+          <div class="ready-actions">
+            <button type="button" class="ready-btn" id="options-ready-btn">Exporter le prompt</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section
+      class="panel"
+      role="tabpanel"
+      id="panel-bot"
+      aria-labelledby="tab-bot"
+      hidden
+    >
+      <p class="panel-placeholder">Le contenu de cet onglet sera ajouté ensuite.</p>
+    </section>
+      </main>
+    </div>
+  </div>
+
+  <dialog class="brief-dialog" id="brief-dialog">
+    <div class="brief-dialog-head">
+      <h2>Brief pour l’IA</h2>
+      <button type="button" class="ghost-btn" id="brief-close">Fermer</button>
+    </div>
+    <textarea id="brief-text" class="brief-text" spellcheck="false"></textarea>
+    <div class="brief-actions">
+      <button type="button" class="ghost-btn" id="brief-copy">Copier</button>
+      <button type="button" class="ready-btn" id="brief-download">Télécharger</button>
+    </div>
+  </dialog>
+
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
