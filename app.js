@@ -75,6 +75,8 @@ const optionCards = [
     id: "opt1",
     name: "Option 1 — Essentielle",
     pitch: "Socle de service aligné sur la prise de besoin et la grille de prix.",
+    definition: "",
+    manualPrice: null,
     lockedBase: true,
     extras: []
   },
@@ -114,8 +116,26 @@ function extrasTotal(card) {
   }, 0);
 }
 
+function hasGridBase() {
+  return getMonthlyTotal() > 0 || getOneOffTotal() > 0;
+}
+
+function useManualOption1() {
+  return !isNeedsReady() && !hasGridBase();
+}
+
+function getOptionsBase() {
+  if (useManualOption1()) return optionCards[0].manualPrice;
+  return getMonthlyTotal();
+}
+
 function optionTotal(card) {
-  return getMonthlyTotal() + extrasTotal(card);
+  const extra = extrasTotal(card);
+  const base = getOptionsBase();
+  if (base === null || base === undefined || Number.isNaN(base)) {
+    return extra > 0 ? extra : null;
+  }
+  return base + extra;
 }
 
 function availableBundlesFor(card) {
@@ -126,47 +146,53 @@ function availableBundlesFor(card) {
 }
 
 function renderResume() {
-  const ready = isNeedsReady();
-  document.getElementById("resume-locked").hidden = ready;
-  document.getElementById("resume-content").hidden = !ready;
-  if (!ready) return;
+  document.getElementById("resume-locked").hidden = true;
+  document.getElementById("resume-content").hidden = false;
 
-  const base = getMonthlyTotal();
+  const quick = useManualOption1();
+  const base = getOptionsBase();
   const oneoff = getOneOffTotal();
-  document.getElementById("resume-client").innerHTML = `
-    <div class="resume-client-grid">
-      <div><span>Client</span><strong>${escapeHtml(answers.entreprise)}</strong></div>
-      <div><span>Contact</span><strong>${escapeHtml(answers.contact)}${answers.role_contact ? ` — ${escapeHtml(answers.role_contact)}` : ""}</strong></div>
-      <div><span>Budget TI</span><strong>${escapeHtml(answers.budget || "Non renseigné")}</strong></div>
-      <div><span>Mensualité de base</span><strong>${formatPrice(base)}</strong></div>
-      <div><span>Frais uniques</span><strong>${formatPrice(oneoff)}</strong></div>
-    </div>
-  `;
+  const opt1 = optionCards[0];
+
+  document.getElementById("resume-client").innerHTML = quick
+    ? `<div class="resume-client-grid is-quick">
+        <div class="wide"><span>Mode</span><strong>Rapide — sans prise de besoin</strong></div>
+        <div><span>Client</span><strong>${escapeHtml(answers.entreprise || "À préciser")}</strong></div>
+        <div><span>Base option 1</span><strong data-opt-header-base>${formatPrice(opt1.manualPrice)}</strong></div>
+      </div>
+      <p class="option-note">Écrivez la définition et le prix de l’option 1. Les options 2 et 3 partent de ce montant.</p>`
+    : `<div class="resume-client-grid">
+        <div><span>Client</span><strong>${escapeHtml(answers.entreprise || "À préciser")}</strong></div>
+        <div><span>Contact</span><strong>${escapeHtml(answers.contact || "À préciser")}${answers.role_contact ? ` — ${escapeHtml(answers.role_contact)}` : ""}</strong></div>
+        <div><span>Budget TI</span><strong>${escapeHtml(answers.budget || "Non renseigné")}</strong></div>
+        <div><span>Mensualité de base</span><strong>${formatPrice(base)}</strong></div>
+        <div><span>Frais uniques</span><strong>${formatPrice(oneoff)}</strong></div>
+      </div>`;
+
+  const gridBaseList = `<ul class="option-base-list">
+    ${
+      DATA.catalog
+        .flatMap((category) => {
+          if (category.kind === "oneoff") return [];
+          return lines[category.id].map(
+            (line) =>
+              `<li><span>${escapeHtml(line.label)}</span><strong>${formatPrice(lineTotal(line))}</strong></li>`
+          );
+        })
+        .concat(
+          getSatQuote().details
+            .filter((entry) => entry.total > 0)
+            .map(
+              (entry) =>
+                `<li><span>${escapeHtml(entry.label)}</span><strong>${formatPrice(entry.total)}</strong></li>`
+            )
+        )
+        .join("") || "<li>Aucun item mensuel sélectionné dans la grille.</li>"
+    }
+  </ul>`;
 
   document.getElementById("options-root").innerHTML = optionCards
     .map((card) => {
-      const baseList = `<ul class="option-base-list">
-        ${
-          DATA.catalog
-            .flatMap((category) => {
-              if (category.kind === "oneoff") return [];
-              return lines[category.id].map(
-                (line) =>
-                  `<li><span>${escapeHtml(line.label)}</span><strong>${formatPrice(lineTotal(line))}</strong></li>`
-              );
-            })
-            .concat(
-              getSatQuote().details
-                .filter((entry) => entry.total > 0)
-                .map(
-                  (entry) =>
-                    `<li><span>${escapeHtml(entry.label)}</span><strong>${formatPrice(entry.total)}</strong></li>`
-                )
-            )
-            .join("") || "<li>Aucun item mensuel sélectionné dans la grille.</li>"
-        }
-      </ul>`;
-
       const extrasHtml =
         card.extras.length === 0
           ? `<p class="option-note">Aucun bundle ajouté. Utilisez « + » pour enrichir cette option.</p>`
@@ -198,18 +224,39 @@ function renderResume() {
 
       const added = extrasTotal(card);
       const total = optionTotal(card);
+      const isOpt1 = card.id === "opt1";
+
+      let baseBlock = "";
+      if (quick && isOpt1) {
+        baseBlock = `<label class="field option-definition">
+            <span>Définition</span>
+            <textarea data-opt-definition="${card.id}" rows="5" placeholder="Décrivez le périmètre, les inclusions et la promesse de cette option.">${escapeHtml(card.definition || "")}</textarea>
+          </label>
+          <label class="field extra-price-field option-manual-price">
+            <span>Prix de l’option 1</span>
+            <input class="money-input" data-opt-base-price="${card.id}" type="text" inputmode="decimal" value="${escapeAttr(priceInputValue(card.manualPrice))}" placeholder="À déterminer">
+          </label>
+          <p class="option-note">Option de référence du mode rapide. Les options 2 et 3 ajoutent des bundles sur ce prix.</p>`;
+      } else if (quick) {
+        baseBlock = `<div class="option-base">
+            <span>Base (option 1)</span>
+            <strong>${formatPrice(opt1.manualPrice)}</strong>
+          </div>`;
+      } else {
+        baseBlock = `<div class="option-base">
+            <span>Base (onglet 1)</span>
+            <strong>${formatPrice(base)}</strong>
+          </div>
+          ${isOpt1 ? `<p class="option-note">Option de référence. Ajoutez des bundles seulement si nécessaire.</p>` : ""}
+          ${gridBaseList}`;
+      }
 
       return `<article class="option-card" data-opt="${card.id}">
         <header>
           <input class="option-title" data-opt-name="${card.id}" type="text" value="${escapeAttr(card.name)}">
           <textarea class="option-pitch" data-opt-pitch="${card.id}" rows="2">${escapeHtml(card.pitch)}</textarea>
         </header>
-        <div class="option-base">
-          <span>Base (onglet 1)</span>
-          <strong>${formatPrice(base)}</strong>
-        </div>
-        ${card.lockedBase ? `<p class="option-note">Option de référence. Ajoutez des bundles seulement si nécessaire.</p>` : ""}
-        ${baseList}
+        ${baseBlock}
         <div class="option-extras">
           <div class="option-extras-head">
             <h3>Bundles ajoutés</h3>
@@ -233,12 +280,18 @@ function renderResume() {
 }
 
 function refreshOptionTotals() {
+  const base = getOptionsBase();
   optionCards.forEach((card) => {
     const added = document.querySelector(`[data-opt-added="${card.id}"]`);
     const total = document.querySelector(`[data-opt-total="${card.id}"]`);
     if (added) added.textContent = formatPrice(extrasTotal(card));
     if (total) total.textContent = formatPrice(optionTotal(card));
   });
+  document.querySelectorAll('.option-card:not([data-opt="opt1"]) .option-base strong').forEach((el) => {
+    el.textContent = formatPrice(base);
+  });
+  const headerBase = document.querySelector("[data-opt-header-base]");
+  if (headerBase) headerBase.textContent = formatPrice(base);
 }
 
 function findExtra(cardId, uid) {
@@ -248,7 +301,9 @@ function findExtra(cardId, uid) {
 }
 
 function collectOptionsBrief() {
-  const base = getMonthlyTotal();
+  const quick = useManualOption1();
+  const base = getOptionsBase();
+  const opt1 = optionCards[0];
   const entreprise = answers.entreprise || "Client à confirmer";
   const chunks = [
     `# One-pager ODS — 3 options — ${entreprise}`,
@@ -263,38 +318,56 @@ function collectOptionsBrief() {
     `- **Domaine** : ${answers.domaine || "Non renseigné"}`,
     `- **Budget TI** : ${answers.budget || "Non renseigné"}`,
     `- **Enjeux** : ${(answers.enjeux || "").trim() || "Non renseigné"}`,
-    `- **Pourquoi maintenant** : ${(answers.pourquoi || "").trim() || "Non renseigné"}`,
-    "",
-    `## Prix de base`,
-    `- Mensualité issue de la grille : ${formatPrice(base)}`,
-    `- Frais uniques : ${formatPrice(getOneOffTotal())}`
+    `- **Pourquoi maintenant** : ${(answers.pourquoi || "").trim() || "Non renseigné"}`
   ];
 
-  const satQuoteHead = getSatQuote();
-  if (satQuoteHead.active && !satQuoteHead.error) {
-    chunks.push(`- Dont SAT (calculateur) : ${formatPrice(satQuoteHead.monthly)} / mois + ${formatPrice(satQuoteHead.implantation)} d'implantation`);
-  }
+  if (quick) {
+    chunks.push(
+      "",
+      "## Mode rapide",
+      "Aucune prise de besoin complète n’a été saisie. L’option 1 est définie et tarifée manuellement ; les options 2 et 3 s’appuient sur ce prix.",
+      "",
+      "## Prix de base (saisie manuelle)",
+      `- Définition option 1 : ${(opt1.definition || "").trim() || "Non renseigné"}`,
+      `- Prix option 1 : ${formatPrice(opt1.manualPrice)}`
+    );
+  } else {
+    chunks.push(
+      "",
+      `## Prix de base`,
+      `- Mensualité issue de la grille : ${formatPrice(base)}`,
+      `- Frais uniques : ${formatPrice(getOneOffTotal())}`
+    );
 
-  const monthlyLines = [];
-  DATA.catalog.forEach((category) => {
-    if (category.kind === "oneoff") return;
-    lines[category.id].forEach((line) => {
-      monthlyLines.push(`- ${line.label} : ${formatPrice(lineTotal(line))}`);
+    const satQuoteHead = getSatQuote();
+    if (satQuoteHead.active && !satQuoteHead.error) {
+      chunks.push(`- Dont SAT (calculateur) : ${formatPrice(satQuoteHead.monthly)} / mois + ${formatPrice(satQuoteHead.implantation)} d'implantation`);
+    }
+
+    const monthlyLines = [];
+    DATA.catalog.forEach((category) => {
+      if (category.kind === "oneoff") return;
+      lines[category.id].forEach((line) => {
+        monthlyLines.push(`- ${line.label} : ${formatPrice(lineTotal(line))}`);
+      });
     });
-  });
-  const satQuote = getSatQuote();
-  if (satQuote.active && !satQuote.error) {
-    satQuote.details.forEach((entry) => {
-      monthlyLines.push(`- ${entry.label} : ${entry.total ? formatPrice(entry.total) : "Inclus"}`);
-    });
+    const satQuote = getSatQuote();
+    if (satQuote.active && !satQuote.error) {
+      satQuote.details.forEach((entry) => {
+        monthlyLines.push(`- ${entry.label} : ${entry.total ? formatPrice(entry.total) : "Inclus"}`);
+      });
+    }
+    chunks.push("", "### Détail de la base");
+    chunks.push(monthlyLines.length ? monthlyLines.join("\n") : "- Aucun item mensuel");
   }
-  chunks.push("", "### Détail de la base");
-  chunks.push(monthlyLines.length ? monthlyLines.join("\n") : "- Aucun item mensuel");
 
   chunks.push("", "## Les 3 options");
   optionCards.forEach((card, index) => {
     chunks.push("", `### ${card.name}`);
     chunks.push(card.pitch);
+    if (quick && index === 0 && (opt1.definition || "").trim()) {
+      chunks.push(`- **Définition** : ${opt1.definition.trim()}`);
+    }
     chunks.push(`- Base : ${formatPrice(base)}`);
     if (!card.extras.length) {
       chunks.push("- Aucun bundle ajouté");
@@ -315,7 +388,7 @@ function collectOptionsBrief() {
   chunks.push(
     "",
     "## Consigne de rédaction",
-    "Produis un one-pager client avec : rappel du besoin, tableau comparatif des 3 options, bénéfices de chaque bundle retenu, prix ajouté et mensualité totale par option, et une recommandation brève. Ton BZ, clair et orienté décision."
+    "Produis un one-pager client avec : rappel du besoin, tableau comparatif des 3 options, bénéfices de chaque bundle retenu, prix ajouté et mensualité totale par option, et une recommandation brève. Ton BZ, clair et orienté décision. Si un prix est « À déterminer », laisse-le tel quel."
   );
 
   return chunks.join("\n");
@@ -330,16 +403,13 @@ function isNeedsReady() {
 }
 
 function updateResumeAccess() {
-  const ready = isNeedsReady();
   const tab = document.getElementById("tab-resume");
   const goBtn = document.getElementById("to-options-btn");
-  tab.classList.toggle("is-locked", !ready);
-  tab.setAttribute("aria-disabled", String(!ready));
+  tab.classList.remove("is-locked");
+  tab.setAttribute("aria-disabled", "false");
   if (goBtn) {
-    goBtn.disabled = !ready;
-    goBtn.title = ready
-      ? "Ouvrir le résumé 3 options"
-      : "Complétez entreprise, contact et rôle du contact";
+    goBtn.disabled = false;
+    goBtn.title = "Ouvrir le résumé 3 options";
   }
 }
 
@@ -767,7 +837,7 @@ function renderPriceCategory(category) {
           <option value="">Ajouter un item…</option>
           ${options}
         </select>
-        <button type="button" class="add-custom" data-act="custom" data-cat="${category.id}">+ Élément</button>
+        ${renderCatActionButtons(category)}
       </div>
     </div>
     <table class="price-table">
@@ -874,10 +944,10 @@ function findLine(catId, uidValue) {
   return lines[catId].find((line) => line.uid === uidValue);
 }
 
-function addCatalogItem(catId, itemId) {
+function addCatalogItem(catId, itemId, { render = true } = {}) {
   const category = DATA.catalog.find((item) => item.id === catId);
   const item = category.items.find((entry) => entry.id === itemId);
-  if (!item || lines[catId].some((line) => line.itemId === item.id)) return;
+  if (!item || lines[catId].some((line) => line.itemId === item.id)) return false;
   lines[catId].push({
     uid: nextId(),
     itemId: item.id,
@@ -886,8 +956,34 @@ function addCatalogItem(catId, itemId) {
     qty: 1,
     custom: false
   });
+  if (render) {
+    openFamilyFor(catId);
+    renderPricing();
+  }
+  return true;
+}
+
+function addCatalogPack(catId) {
+  const category = DATA.catalog.find((item) => item.id === catId);
+  const ids = category?.quickPack?.itemIds || [];
+  let added = false;
+  ids.forEach((itemId) => {
+    if (addCatalogItem(catId, itemId, { render: false })) added = true;
+  });
+  if (!added) return;
   openFamilyFor(catId);
   renderPricing();
+}
+
+function renderCatActionButtons(category) {
+  const customBtn = `<button type="button" class="add-custom" data-act="custom" data-cat="${category.id}">+ Élément</button>`;
+  const pack = category.quickPack;
+  if (!pack) return customBtn;
+  const missing = pack.itemIds.some((itemId) => !lines[category.id].some((line) => line.itemId === itemId));
+  return `<div class="cat-side-actions">
+    <button type="button" class="add-custom cat-pack-btn" data-act="pack" data-cat="${category.id}" ${missing ? "" : "disabled"} title="Ajouter machines virtuelles, processeurs, RAM et espace disque">${escapeHtml(pack.label)}</button>
+    ${customBtn}
+  </div>`;
 }
 
 function addCustomItem(catId) {
@@ -969,6 +1065,7 @@ document.getElementById("pricing-root").addEventListener("click", (event) => {
   const catId = button.getAttribute("data-cat");
   const rowUid = button.getAttribute("data-uid");
   if (act === "custom") addCustomItem(catId);
+  if (act === "pack") addCatalogPack(catId);
   if (act === "remove") {
     lines[catId] = lines[catId].filter((line) => String(line.uid) !== String(rowUid));
     openFamilyFor(catId);
@@ -1193,12 +1290,6 @@ document.getElementById("ready-btn").addEventListener("click", () => {
 
 document.getElementById("to-options-btn").addEventListener("click", () => {
   updateResumeAccess();
-  if (!isNeedsReady()) {
-    document.getElementById("page-scroll")?.scrollTo({ top: 0, behavior: "smooth" });
-    const field = document.getElementById("q-entreprise") || document.getElementById("q-contact");
-    field?.focus();
-    return;
-  }
   activateTab(document.getElementById("tab-resume"));
   document.getElementById("page-scroll")?.scrollTo({ top: 0 });
 });
@@ -1258,6 +1349,21 @@ document.getElementById("options-root").addEventListener("input", (event) => {
     if (card) card.pitch = pitch.value;
     return;
   }
+  const definition = event.target.closest("[data-opt-definition]");
+  if (definition) {
+    const card = optionCards.find((entry) => entry.id === definition.dataset.optDefinition);
+    if (card) card.definition = definition.value;
+    return;
+  }
+  const basePrice = event.target.closest("[data-opt-base-price]");
+  if (basePrice) {
+    const card = optionCards.find((entry) => entry.id === basePrice.dataset.optBasePrice);
+    if (card) {
+      card.manualPrice = parseMoney(basePrice.value);
+      refreshOptionTotals();
+    }
+    return;
+  }
   const label = event.target.closest("[data-extra-label]");
   if (label) {
     const extra = findExtra(label.dataset.extraLabel, label.dataset.uid);
@@ -1281,6 +1387,13 @@ document.getElementById("options-root").addEventListener("input", (event) => {
 });
 
 document.getElementById("options-root").addEventListener("blur", (event) => {
+  const basePrice = event.target.closest("[data-opt-base-price]");
+  if (basePrice) {
+    const card = optionCards.find((entry) => entry.id === basePrice.dataset.optBasePrice);
+    if (!card) return;
+    basePrice.value = priceInputValue(card.manualPrice);
+    return;
+  }
   const price = event.target.closest("[data-extra-price]");
   if (!price) return;
   const extra = findExtra(price.dataset.extraPrice, price.dataset.uid);

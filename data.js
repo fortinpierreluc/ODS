@@ -147,6 +147,10 @@ window.ODS_DATA = {
       family: "TI",
       name: "Ressources BZ Cloud",
       kind: "monthly",
+      quickPack: {
+        label: "OUI",
+        itemIds: ["vm", "cpu", "ram", "disk"]
+      },
       items: [
         { id: "vm", label: "Machines virtuelles", price: 6.5 },
         { id: "cpu", label: "Processeurs", price: 34.35 },
